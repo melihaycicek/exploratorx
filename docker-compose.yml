@@ -1,0 +1,181 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# ExploratorX — MVP stack
+#
+#   docker compose up -d
+#
+# Services: postgres, kafka (KRaft), connect (Debezium), kafka-ui, engine, dashboard
+# No ZooKeeper. No Redis. No separate generator/detector containers.
+#
+# The engine and dashboard services live behind the "app" profile because their
+# Dockerfiles are produced in later phases (Phase 2 and Phase 5). To bring up only
+# the infrastructure during Phase 1:   docker compose up -d
+# Once the app images exist:            docker compose --profile app up -d
+# ──────────────────────────────────────────────────────────────────────────────
+
+name: exploratorx
+
+services:
+  exploratorx-postgres:
+    image: postgres:16
+    container_name: exploratorx-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-exploratorx}
+    # Enable logical replication without editing config files (spec requirement).
+    command: >
+      postgres
+        -c wal_level=logical
+        -c max_replication_slots=10
+        -c max_wal_senders=10
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - exploratorx-postgres-data:/var/lib/postgresql/data
+      # init scripts run in alphabetical order on first boot
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      - ./infra/postgres/seed-cdr.sql:/docker-entrypoint-initdb.d/02-seed-cdr.sql:ro
+      - ./infra/postgres/seed-payment.sql:/docker-entrypoint-initdb.d/03-seed-payment.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-exploratorx}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - exploratorx-net
+
+  exploratorx-kafka:
+    image: confluentinc/cp-kafka:7.6.1
+    container_name: exploratorx-kafka
+    restart: unless-stopped
+    ports:
+      - "29092:29092"
+    environment:
+      # ---- KRaft (no ZooKeeper) ----
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      CLUSTER_ID: ${KAFKA_CLUSTER_ID:-ExploratorXKRaftCluster1}
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@exploratorx-kafka:9093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      # ---- Listeners: internal (docker network) + host ----
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093,HOST://0.0.0.0:29092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://exploratorx-kafka:9092,HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT,HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      # ---- Single-node defaults ----
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+    volumes:
+      - exploratorx-kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 15
+    networks:
+      - exploratorx-net
+
+  exploratorx-connect:
+    image: debezium/connect:2.7.3.Final
+    container_name: exploratorx-connect
+    restart: unless-stopped
+    depends_on:
+      exploratorx-kafka:
+        condition: service_healthy
+      exploratorx-postgres:
+        condition: service_healthy
+    ports:
+      - "${CONNECT_HOST_PORT:-8083}:8083"
+    environment:
+      BOOTSTRAP_SERVERS: exploratorx-kafka:9092
+      GROUP_ID: ${CONNECT_GROUP_ID:-exploratorx-connect}
+      CONFIG_STORAGE_TOPIC: exploratorx_connect_configs
+      OFFSET_STORAGE_TOPIC: exploratorx_connect_offsets
+      STATUS_STORAGE_TOPIC: exploratorx_connect_statuses
+      CONFIG_STORAGE_REPLICATION_FACTOR: 1
+      OFFSET_STORAGE_REPLICATION_FACTOR: 1
+      STATUS_STORAGE_REPLICATION_FACTOR: 1
+      KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      CONNECT_KEY_CONVERTER_SCHEMAS_ENABLE: "false"
+      CONNECT_VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
+    volumes:
+      - ./infra/debezium/connectors:/exploratorx/connectors:ro
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8083/ >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+    networks:
+      - exploratorx-net
+
+  exploratorx-kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: exploratorx-kafka-ui
+    restart: unless-stopped
+    depends_on:
+      exploratorx-kafka:
+        condition: service_healthy
+    ports:
+      - "${KAFKA_UI_PORT:-8090}:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: exploratorx
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: exploratorx-kafka:9092
+      KAFKA_CLUSTERS_0_KAFKACONNECT_0_NAME: exploratorx-connect
+      KAFKA_CLUSTERS_0_KAFKACONNECT_0_ADDRESS: http://exploratorx-connect:8083
+      DYNAMIC_CONFIG_ENABLED: "true"
+    networks:
+      - exploratorx-net
+
+  # ---- Application services (added in later phases; behind "app" profile) ----
+  exploratorx-engine:
+    build:
+      context: ./exploratorx-engine
+      dockerfile: Dockerfile
+    container_name: exploratorx-engine
+    restart: unless-stopped
+    profiles: ["app"]
+    depends_on:
+      exploratorx-kafka:
+        condition: service_healthy
+      exploratorx-postgres:
+        condition: service_healthy
+    ports:
+      - "${ENGINE_PORT:-8080}:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://exploratorx-postgres:5432/${POSTGRES_DB:-exploratorx}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_APP_USER:-exploratorx}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_APP_PASSWORD:-exploratorx}
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: exploratorx-kafka:9092
+    networks:
+      - exploratorx-net
+
+  exploratorx-dashboard:
+    build:
+      context: ./exploratorx-dashboard
+      dockerfile: Dockerfile
+    container_name: exploratorx-dashboard
+    restart: unless-stopped
+    profiles: ["app"]
+    depends_on:
+      - exploratorx-engine
+    ports:
+      - "${DASHBOARD_PORT:-3000}:3000"
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8080}
+      NEXT_PUBLIC_WS_URL: ${NEXT_PUBLIC_WS_URL:-http://localhost:8080/ws}
+    networks:
+      - exploratorx-net
+
+volumes:
+  exploratorx-postgres-data:
+  exploratorx-kafka-data:
+
+networks:
+  exploratorx-net:
+    name: exploratorx-net
+    driver: bridge

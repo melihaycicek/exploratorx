@@ -1,0 +1,51 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# ExploratorX — Observability overlay
+#
+#   docker compose -f docker-compose.yml -f docker-compose.observability.yml up -d
+#
+# Adds Prometheus (scrapes the engine's Actuator endpoint) and Grafana
+# (provisioned with CDR and Payment fraud dashboards).
+# ──────────────────────────────────────────────────────────────────────────────
+
+name: exploratorx
+
+services:
+  exploratorx-prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: exploratorx-prometheus
+    restart: unless-stopped
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - exploratorx-prometheus-data:/prometheus
+    networks:
+      - exploratorx-net
+
+  exploratorx-grafana:
+    image: grafana/grafana:11.2.0
+    container_name: exploratorx-grafana
+    restart: unless-stopped
+    depends_on:
+      - exploratorx-prometheus
+    ports:
+      - "${GRAFANA_PORT:-3001}:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./infra/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infra/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - exploratorx-grafana-data:/var/lib/grafana
+    networks:
+      - exploratorx-net
+
+volumes:
+  exploratorx-prometheus-data:
+  exploratorx-grafana-data:
+
+networks:
+  exploratorx-net:
+    name: exploratorx-net
+    driver: bridge

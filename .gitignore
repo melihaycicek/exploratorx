@@ -1,0 +1,33 @@
+# Progress notes — local only, never push
+PROGRESS.md
+progress/
+.progress/
+notes/
+.notes/
+
+# Local dev overrides
+.env
+.env.local
+docker-compose.override.yml
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Java build artifacts
+target/
+
+# Node / Next.js
+.next/
+node_modules/
+build/
+dist/
+
+# Debezium local offsets
+/tmp/debezium-*.dat
+*.dat
+
+# OS
+.DS_Store
+Thumbs.db
