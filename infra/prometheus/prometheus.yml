@@ -1,0 +1,21 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# ExploratorX — Prometheus configuration
+# Scrapes the engine's Spring Boot Actuator Prometheus endpoint.
+# ──────────────────────────────────────────────────────────────────────────────
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+  external_labels:
+    project: exploratorx
+
+scrape_configs:
+  - job_name: exploratorx-engine
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["exploratorx-engine:8080"]
+        labels:
+          service: exploratorx-engine
+
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
