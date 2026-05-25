@@ -1,0 +1,23 @@
+{
+  "name": "exploratorx-pay-postgres-connector",
+  "config": {
+    "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+    "database.hostname": "exploratorx-postgres",
+    "database.port": "5432",
+    "database.user": "debezium",
+    "database.password": "debezium",
+    "database.dbname": "exploratorx",
+    "topic.prefix": "exploratorx.pay",
+    "table.include.list": "public.payment_transaction",
+    "plugin.name": "pgoutput",
+    "slot.name": "exploratorx_pay_slot",
+    "publication.name": "exploratorx_pay_pub",
+    "publication.autocreate.mode": "filtered",
+    "signal.data.collection": "public.debezium_signal_pay",
+    "incremental.snapshot.enabled": "true",
+    "key.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "key.converter.schemas.enable": "false",
+    "value.converter.schemas.enable": "false"
+  }
+}
