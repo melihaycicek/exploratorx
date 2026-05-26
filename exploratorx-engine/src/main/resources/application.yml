@@ -1,0 +1,78 @@
+spring:
+  application:
+    name: exploratorx-engine
+
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:exploratorx}
+    username: ${POSTGRES_USER:exploratorx}
+    password: ${POSTGRES_PASSWORD:exploratorx}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:29092}
+    consumer:
+      group-id: exploratorx-engine
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+    streams:
+      application-id: exploratorx-streams
+      bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:29092}
+      default-key-serde: org.apache.kafka.common.serialization.Serdes$StringSerde
+      default-value-serde: org.apache.kafka.common.serialization.Serdes$StringSerde
+      state-dir: /tmp/kafka-streams/exploratorx
+      replication-factor: 1
+
+server:
+  port: ${SERVER_PORT:8080}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+
+exploratorx:
+  thresholds:
+    cdr:
+      impossible-speed-kmh: 900
+      suspicious-speed-kmh: 300
+      split-signal-window-seconds: 60
+    pay:
+      impossible-speed-kmh: 500
+      velocity-window-minutes: 5
+      velocity-max-transactions: 5
+  demo:
+    signal-interval-ms: 1500
+  websocket:
+    broker-relay: false
+  topics:
+    cdr:
+      raw: exploratorx.cdr.public.cdr_signal
+      clean: exploratorx.cdr.signals.clean
+      anomalies: exploratorx.cdr.anomalies
+    pay:
+      raw: exploratorx.pay.public.payment_transaction
+      clean: exploratorx.pay.transactions.clean
+      fraud-alerts: exploratorx.pay.fraud.alerts
+    audit: exploratorx.audit
+    dlq: exploratorx.dlq
