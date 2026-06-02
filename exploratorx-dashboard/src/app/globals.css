@@ -1,0 +1,135 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── Base ─────────────────────────────────────────────────────────────────── */
+:root {
+  --bg-900: #0a0e1a;
+  --bg-800: #0f1525;
+  --bg-700: #141c30;
+  --bg-600: #1a2340;
+  --border: rgba(255,255,255,0.08);
+  --brand:  #38bdf8;
+
+  --decision-normal:     #22c55e;
+  --decision-suspicious: #eab308;
+  --decision-impossible: #ef4444;
+  --decision-challenge:  #f97316;
+  --decision-split:      #a855f7;
+  --decision-duplicate:  #6b7280;
+  --decision-outoforder: #94a3b8;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body, #__next {
+  height: 100%;
+  background: var(--bg-900);
+  color: #e2e8f0;
+  font-family: 'Inter', ui-sans-serif, system-ui;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ─── Scrollbar ─────────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 2px; }
+
+/* ─── Glass card ────────────────────────────────────────────────────────────── */
+.glass {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.glass-strong {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.12);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+/* ─── Decision badge colors ─────────────────────────────────────────────────── */
+.badge-normal     { background: rgba(34,197,94,0.15);   color: #22c55e;  border-color: rgba(34,197,94,0.3);   }
+.badge-suspicious { background: rgba(234,179,8,0.15);   color: #eab308;  border-color: rgba(234,179,8,0.3);   }
+.badge-high       { background: rgba(234,179,8,0.2);    color: #f59e0b;  border-color: rgba(234,179,8,0.4);   }
+.badge-impossible { background: rgba(239,68,68,0.15);   color: #ef4444;  border-color: rgba(239,68,68,0.3);   }
+.badge-challenge  { background: rgba(249,115,22,0.15);  color: #f97316;  border-color: rgba(249,115,22,0.3);  }
+.badge-split      { background: rgba(168,85,247,0.15);  color: #a855f7;  border-color: rgba(168,85,247,0.3);  }
+.badge-duplicate  { background: rgba(107,114,128,0.15); color: #9ca3af;  border-color: rgba(107,114,128,0.3); }
+.badge-approved   { background: rgba(34,197,94,0.15);   color: #22c55e;  border-color: rgba(34,197,94,0.3);   }
+.badge-blocked    { background: rgba(239,68,68,0.2);    color: #ef4444;  border-color: rgba(239,68,68,0.4);   }
+.badge-review     { background: rgba(234,179,8,0.15);   color: #eab308;  border-color: rgba(234,179,8,0.3);   }
+
+/* ─── Pulse animation for SPLIT_SIGNAL ─────────────────────────────────────── */
+@keyframes split-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(168,85,247,0.4); }
+  50%       { box-shadow: 0 0 0 8px rgba(168,85,247,0); }
+}
+.pulse-split { animation: split-pulse 2s ease-in-out infinite; }
+
+/* ─── Live indicator blink ──────────────────────────────────────────────────── */
+@keyframes live-blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.3; }
+}
+.live-dot { animation: live-blink 1.5s ease-in-out infinite; }
+
+/* ─── Slide-in for new events ───────────────────────────────────────────────── */
+@keyframes slideInRight {
+  from { transform: translateX(20px); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+.animate-slide-in { animation: slideInRight 0.3s ease-out; }
+
+/* ─── Leaflet overrides ─────────────────────────────────────────────────────── */
+.leaflet-container {
+  background: #0a0e1a !important;
+  font-family: 'Inter', sans-serif;
+}
+.leaflet-tile {
+  filter: brightness(0.7) saturate(0.6) hue-rotate(200deg);
+}
+.leaflet-control-attribution {
+  background: rgba(10,14,26,0.8) !important;
+  color: rgba(255,255,255,0.4) !important;
+  font-size: 10px;
+}
+.leaflet-control-zoom a {
+  background: rgba(15,21,37,0.9) !important;
+  color: #94a3b8 !important;
+  border-color: rgba(255,255,255,0.1) !important;
+}
+.leaflet-control-zoom a:hover {
+  background: rgba(26,35,64,0.9) !important;
+  color: #e2e8f0 !important;
+}
+
+/* ─── Button variants ───────────────────────────────────────────────────────── */
+.btn {
+  @apply inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium
+         transition-all duration-200 cursor-pointer border;
+}
+.btn-ghost {
+  @apply border-transparent bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white;
+}
+.btn-brand {
+  @apply border-sky-500/40 bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 hover:text-sky-300;
+}
+.btn-danger {
+  @apply border-red-500/40 bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300;
+}
+.btn-cdr {
+  @apply border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20
+         text-emerald-400 hover:text-emerald-300 text-xs;
+}
+.btn-pay {
+  @apply border-violet-500/30 bg-violet-500/10 hover:bg-violet-500/20
+         text-violet-400 hover:text-violet-300 text-xs;
+}
+.btn-reset {
+  @apply border-rose-500/40 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs;
+}
