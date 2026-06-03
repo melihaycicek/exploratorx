@@ -5,6 +5,10 @@ progress/
 notes/
 .notes/
 
+# Article — local only, never push
+docs/article.md
+
+
 # Local dev overrides
 .env
 .env.local

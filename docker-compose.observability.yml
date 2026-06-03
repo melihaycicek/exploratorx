@@ -4,7 +4,7 @@
 #   docker compose -f docker-compose.yml -f docker-compose.observability.yml up -d
 #
 # Adds Prometheus (scrapes the engine's Actuator endpoint) and Grafana
-# (provisioned with CDR and Payment fraud dashboards).
+# (provisioned with CDR and Payment fraud dashboards + alert rules).
 # ──────────────────────────────────────────────────────────────────────────────
 
 name: exploratorx
@@ -18,7 +18,12 @@ services:
       - "${PROMETHEUS_PORT:-9090}:9090"
     volumes:
       - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./infra/prometheus/alert-rules.yml:/etc/prometheus/alert-rules.yml:ro
       - exploratorx-prometheus-data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=15d"
+      - "--web.enable-lifecycle"
     networks:
       - exploratorx-net
 
@@ -34,6 +39,8 @@ services:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
       GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ALERTING_ENABLED: "true"
+      GF_UNIFIED_ALERTING_ENABLED: "true"
     volumes:
       - ./infra/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./infra/grafana/dashboards:/var/lib/grafana/dashboards:ro
