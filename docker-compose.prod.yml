@@ -1,0 +1,83 @@
+version: "3.9"
+
+# ──────────────────────────────────────────────────────────────────────────────
+# ExploratorX — Production Docker Compose override
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# Binds all services to localhost only — Nginx proxies from outside.
+# SSL termination handled by Nginx + Let's Encrypt on audfix.com.
+# ──────────────────────────────────────────────────────────────────────────────
+
+services:
+
+  # ─── Engine ────────────────────────────────────────────────────────────────
+  exploratorx-engine:
+    build:
+      context: ./exploratorx-engine
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      SERVER_PORT: 8080
+      POSTGRES_HOST: postgres
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      SPRING_JPA_HIBERNATE_DDL_AUTO: validate
+    mem_limit: 1g
+    cpus: 1.0
+    restart: unless-stopped
+
+  # ─── Dashboard ─────────────────────────────────────────────────────────────
+  exploratorx-dashboard:
+    build:
+      context: ./exploratorx-dashboard
+      args:
+        # Nginx subpath for audfix.com
+        NEXT_PUBLIC_ENGINE_URL: https://demo.audfix.com/exploratorx/api
+        NEXT_PUBLIC_BASE_PATH: /exploratorx
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      NEXT_PUBLIC_ENGINE_URL: https://demo.audfix.com/exploratorx/api
+      NEXT_PUBLIC_BASE_PATH: /exploratorx
+      NODE_ENV: production
+    mem_limit: 512m
+    cpus: 0.3
+    restart: unless-stopped
+
+  # ─── PostgreSQL ─────────────────────────────────────────────────────────────
+  postgres:
+    ports:
+      - "127.0.0.1:5432:5432"
+    mem_limit: 512m
+    cpus: 0.5
+    restart: unless-stopped
+
+  # ─── Kafka ──────────────────────────────────────────────────────────────────
+  kafka:
+    ports:
+      - "127.0.0.1:29092:29092"
+    environment:
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 1
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_MIN_INSYNC_REPLICAS: 1
+    mem_limit: 1g
+    cpus: 0.5
+    restart: unless-stopped
+
+  # ─── Kafka Connect (Debezium) ────────────────────────────────────────────────
+  kafka-connect:
+    ports:
+      - "127.0.0.1:8083:8083"
+    mem_limit: 768m
+    cpus: 0.5
+    restart: unless-stopped
+
+  # ─── Kafka UI (internal only, no external access) ───────────────────────────
+  kafka-ui:
+    ports:
+      - "127.0.0.1:8989:8080"
+    mem_limit: 256m
+    cpus: 0.2
+    restart: unless-stopped
