@@ -1,0 +1,95 @@
+groups:
+  - name: exploratorx_cdr_alerts
+    interval: 30s
+    rules:
+      # ─── Impossible Signal Rate ──────────────────────────────────────────────
+      - alert: ImpossibleSignalRateHigh
+        expr: rate(cdr_impossible_signals_total[5m]) > 0.1
+        for: 1m
+        labels:
+          severity: critical
+          mode: cdr
+        annotations:
+          summary: "High rate of IMPOSSIBLE_SIGNAL detections"
+          description: "More than 6 impossible signals per minute detected. Possible SIM cloning or replay attack."
+
+      # ─── Split Signal Rate ───────────────────────────────────────────────────
+      - alert: SplitSignalRateHigh
+        expr: rate(cdr_split_signals_total[5m]) > 0.05
+        for: 1m
+        labels:
+          severity: warning
+          mode: cdr
+        annotations:
+          summary: "High rate of SPLIT_SIGNAL detections"
+          description: "Subscriber appearing in multiple cities simultaneously. Rate: {{ $value }}/s"
+
+      # ─── Kafka Streams down ──────────────────────────────────────────────────
+      - alert: KafkaStreamsDown
+        expr: kafka_streams_running == 0
+        for: 30s
+        labels:
+          severity: critical
+          mode: cdr
+        annotations:
+          summary: "Kafka Streams CDR topology is not running"
+          description: "CDR stream processing has stopped. Check kafka-connect and exploratorx-engine logs."
+
+      # ─── No CDR events in last 5 min ─────────────────────────────────────────
+      - alert: NoCdrEventsIngested
+        expr: rate(cdr_events_total[5m]) == 0
+        for: 5m
+        labels:
+          severity: warning
+          mode: cdr
+        annotations:
+          summary: "No CDR events received in 5 minutes"
+          description: "CDR event flow has stopped. Check Debezium CDR connector and PostgreSQL WAL."
+
+      # ─── High Kafka Consumer Lag ─────────────────────────────────────────────
+      - alert: KafkaConsumerLagHigh
+        expr: kafka_stream_consumer_lag > 1000
+        for: 2m
+        labels:
+          severity: warning
+          mode: cdr
+        annotations:
+          summary: "Kafka consumer lag is high"
+          description: "CDR consumer lag: {{ $value }} messages. Processing may be falling behind."
+
+  - name: exploratorx_payment_alerts
+    interval: 30s
+    rules:
+      # ─── High block rate ─────────────────────────────────────────────────────
+      - alert: PaymentBlockRateHigh
+        expr: |
+          100 * rate(payment_blocked_total[5m]) / rate(payment_events_total[5m]) > 20
+        for: 1m
+        labels:
+          severity: critical
+          mode: payment
+        annotations:
+          summary: "High payment block rate (>20%)"
+          description: "{{ $value | printf \"%.1f\" }}% of transactions are being blocked. Possible coordinated fraud attack."
+
+      # ─── Velocity fraud spike ────────────────────────────────────────────────
+      - alert: VelocityFraudSpike
+        expr: rate(payment_velocity_fraud_total[5m]) > 0.05
+        for: 1m
+        labels:
+          severity: warning
+          mode: payment
+        annotations:
+          summary: "Velocity fraud spike detected"
+          description: "Unusual number of velocity fraud triggers. Rate: {{ $value }}/s"
+
+      # ─── No payment events ───────────────────────────────────────────────────
+      - alert: NoPaymentEventsIngested
+        expr: rate(payment_events_total[5m]) == 0
+        for: 5m
+        labels:
+          severity: warning
+          mode: payment
+        annotations:
+          summary: "No payment events received in 5 minutes"
+          description: "Payment event flow has stopped. Check Debezium payment connector."
